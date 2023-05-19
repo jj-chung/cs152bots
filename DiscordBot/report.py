@@ -1,8 +1,10 @@
 from enum import Enum, auto
 import discord
 import re
+import json
 
 class State(Enum):
+    # User-side states for a report
     REPORT_START = auto()
     AWAITING_MESSAGE = auto()
     MESSAGE_IDENTIFIED = auto()
@@ -13,6 +15,15 @@ class State(Enum):
     DESCRIBE_ISSUE = auto()
     RAID = auto()
     BLOCK = auto()
+
+    # Moderator-side states for a report
+    REVIEW_START = auto()
+    HARASSMENT = auto()
+    DANGER = auto()
+    OTHER_VIOLATIONS = auto()
+    REPEAT_OFFENDER = auto()
+    REMOVE_MESSAGE = auto()
+    REVIEW_COMPLETE = auto()
 
 class Report:
     START_KEYWORD = "report"
@@ -141,22 +152,98 @@ class Report:
         mod_channel = mod_channels[message.guild.id]
 
         # A dictionary of relevant report information
-        reportInfo = {"Author": self.author,
-                          "Message Content": self.messageContent,
-                          "Report Reason:": self.reason,
-                          "Abuse Category": self.category,
-                          "Username Issue" : self.usernameIssue,
-                          "Repeat Offender": self.repeatOffender}
-        await mod_channel.send(reportInfo)
+        reportInfo = {"Message": self.messageContent,
+                      "Author": self.author,
+                      "Message Content": self.messageContent,
+                      "Report Reason:": self.reason,
+                      "Abuse Category": self.category,
+                      "Username Issue" : self.usernameIssue,
+                      "Repeat Offender": self.repeatOffender}
+        # await mod_channel.send(reportInfo)
         #scores = self.eval_text(message.content)
         #await mod_channel.send(self.code_format(scores))
         
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
+    
+class ModReview:
+    START_REVIEW_KEYWORD = "review"
+    DISMISS_KEYWORD = "dismiss"
+
+    def __init__(self, client, report):
+        self.state = State.REVIEW_START
+        self.client = client
+
+        # Report information sent to the moderating channel
+        self.report = report
+        self.report_dict = {"Message": report.messageContent,
+                      "Author": report.author,
+                      "Message Content": report.messageContent,
+                      "Report Reason:": report.reason,
+                      "Abuse Category": report.category,
+                      "Username Issue" : report.usernameIssue,
+                      "Repeat Offender": report.repeatOffender}
+    
+    async def handle_mod_message(self, message, mod_channels):
+        '''
+        This function makes up the meat of the moderator-side reporting flow. It defines how we transition between states and what 
+        prompts to offer at each of those states. 
+        '''
+        if message.content == self.DISMISS_KEYWORD:
+            self.state = State.REVIEW_COMPLETE
+            return ["Report dismissed."]
         
+        if self.state == State.REVIEW_START:
+            reply =  "Thank you for starting the reviewing process. \n "
+            for key, value in self.report_dict.items():
+                if value is not None:
+                    reply += key + ": " + str(value) + "\n"
+            reply += "Is this harassment?\n\n"
+            self.state = State.HARASSMENT
+            return [reply]
+        if self.state == State.HARASSMENT:
+            if message.content[0] in ["y", "Y"]:
+                self.state = State.DANGER
+                return ["Does this report indicate a user is in imminent danger?"]
+            else:
+                self.state = State.REVIEW_COMPLETE
+                return ["No further action is required."]
+        # Determine if this person is in danger
+        if self.state == State.DANGER:
+            # There is imminent danger
+            if message.content[0] in ["y", "Y"]:
+                self.state = State.REVIEW_COMPLETE
+                return ["The authorities have been contacted with this user's details."]
+            # No imminent danger, case states on category of the report
+            else:
+                category = self.report.category
+                # Misgendering, Deadnaming, or 
+                if category in ["1", "2", "3"]:
+                    # Remove the original message
+                    await self.report.message.delete()
 
-    
+                    # Check if the user has other violations
+                    self.state = State.OTHER_VIOLATIONS
+                    return ["The message has been removed. Does the user have other violations?"]
+                if category == "4":
+                    self.state = State.REVIEW_COMPLETE
+                    return ["The user has been permanently banned."]
+                if category == "5":
+                    self.state = State.REPEAT_OFFENDER
+                    return ["Is this user a repeat offender (raids)?"]
+        if self.state == State.OTHER_VIOLATIONS:
+            if message.content[0] in ["y", "Y"]:
+                self.state = State.REVIEW_COMPLETE
+                return ["The user has been temporarily banned and flagged for violating Community Guidelines."]
+            else:
+                self.state = State.REVIEW_COMPLETE
+                return ["Thank you. This review is complete."]
+        if self.state == State.REPEAT_OFFENDER:
+            self.state = State.REVIEW_COMPLETE
+            if message.content[0] in ["y", "Y"]:
+                return ["The user has been permanently banned."]
+            else:
+                return ["The user has been temporarily banned and flagged for violating Community Guidelines."]
 
-
-    
-
+    def review_complete(self):
+        return self.state == State.REVIEW_COMPLETE

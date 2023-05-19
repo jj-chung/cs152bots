@@ -7,7 +7,9 @@ import logging
 import re
 import requests
 from report import Report
+from report import ModReview
 import pdb
+from collections import defaultdict
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -34,6 +36,8 @@ class ModBot(discord.Client):
         self.group_num = None
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
+        self.mod_reviews = defaultdict(list) # Map from mod IDs to the state of the reports they're working on
+        self.currReport = None
 
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
@@ -66,7 +70,10 @@ class ModBot(discord.Client):
 
         # Check if this message was sent in a server ("guild") or if it's a DM
         if message.guild:
-            await self.handle_channel_message(message)
+            if message.channel.name == f'group-{self.group_num}-mod':
+                await self.handle_mod_channel_message(message)
+            else:
+                await self.handle_channel_message(message)
         else:
             await self.handle_dm(message)
 
@@ -96,6 +103,7 @@ class ModBot(discord.Client):
 
         # If the report is complete or cancelled, remove it from our map
         if self.reports[author_id].report_complete():
+            await self.handle_mod_channel_message(message, "start", self.reports[author_id])
             self.reports.pop(author_id)
 
     async def handle_channel_message(self, message):
@@ -109,6 +117,50 @@ class ModBot(discord.Client):
         scores = self.eval_text(message.content)
         await mod_channel.send(self.code_format(scores))
 
+    async def handle_mod_channel_message(self, message, keyword="", report=None):
+        mod_channel = self.mod_channels[1103033282779676743]
+
+        if keyword == "start":
+            reply =  "Use the `review` command to begin the reviewing process.\n"
+            reply += "Use the `dismiss` command to cancel the review process.\n"
+            self.currReport = report
+            await mod_channel.send(reply)
+            return
+        
+        author_id = message.author.id
+        responses = []
+
+        print(author_id)
+        
+        print("responding")
+
+        # If we don't currently have an active review for this moderator, add one
+        if author_id not in self.mod_reviews:
+            self.mod_reviews[author_id].append(ModReview(self, self.currReport))
+
+        print("added mod")
+
+        # Let the review class handle this message; forward all the messages it returns to uss
+        for review in self.mod_reviews[author_id]:
+            responses = await review.handle_mod_message(message, self.mod_channels)
+            print("responses", responses)
+            for r in responses:
+                print("response", r)
+                await message.channel.send(r)
+
+        # If the report is complete or cancelled, remove it from our map
+        # This assumes that a moderator must work on one report at a time
+        remaining_mod_reviews = []
+        for review in self.mod_reviews[author_id]:
+            if not review.review_complete():
+                remaining_mod_reviews.append(review)
+
+        if not remaining_mod_reviews:
+            # If a moderator is not working on any reports, remove them from the map
+            self.mod_reviews.pop(author_id)
+        else:
+            # Otherwise, update the number of remainining reports they have
+            self.mod_reviews[author_id] = remaining_mod_reviews
     
     def eval_text(self, message):
         ''''
