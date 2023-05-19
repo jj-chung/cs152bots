@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import requests
-from report import Report
+from DiscordBot.report import Report
 import pdb
 
 # Set up logging to the console
@@ -90,7 +90,7 @@ class ModBot(discord.Client):
             self.reports[author_id] = Report(self)
 
         # Let the report class handle this message; forward all the messages it returns to uss
-        responses = await self.reports[author_id].handle_message(message)
+        responses = await self.reports[author_id].handle_message(message, self.mod_channels)
         for r in responses:
             await message.channel.send(r)
 
