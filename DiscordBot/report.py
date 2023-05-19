@@ -23,7 +23,15 @@ class Report:
         self.state = State.REPORT_START
         self.client = client
         self.message = ""
-        self.reportInfo = {"Abuser" : "", "Content" : "" ,"Reason" : "", "Category": "", "Described Issue" : "", "Repeat Offender" : ""}
+        
+        # These class variables are details regarding the abuse, some may stay
+        # equal to their initial value depending on the abuse category
+        self.author = None
+        self.messageContent = None
+        self.reason = None
+        self.category = None
+        self.usernameIssue = None
+        self.repeatOffender = False
     
     async def handle_message(self, message, mod_channels):
         '''
@@ -31,7 +39,6 @@ class Report:
         prompts to offer at each of those states. You're welcome to change anything you want; this skeleton is just here to
         get you started and give you a model for working with Discord. 
         '''
-        print(self.state)
         if message.content == self.CANCEL_KEYWORD:
             self.state = State.REPORT_COMPLETE
             return ["Report cancelled."]
@@ -61,22 +68,28 @@ class Report:
                 return ["It seems this message was deleted or never existed. Please try again or say `cancel` to cancel."]
 
             # Here we've found the message - it's up to you to decide what to do next!
-            self.state = State.SELECTING
+            self.state = State.MESSAGE_IDENTIFIED
             self.message = message
-            self.reportInfo["Abuser"] = message.author.name
-            self.reportInfo["Content"] = message.content
-            return ["I found this message:", "```" + message.author.name + ": " + message.content + "```" + "\n" + "Please reply with the number corresponding to the reason for reporting this post:" + "\n1. Hate Speech" + "\n2. Nudity or Sexual Activity" + "\n3. Harassment" + "\n4. Imminent Danger"]
-        # TO DO: PROMPT USER TO CONFIRM IDENTIFIED MESSAGE (self.message)
-        # ["Is this the message you would like to report?"]
-        
-        # Wait on Abuse Type selection
-        # if self.state == State.MESSAGE_IDENTIFIED:
-        #     self.state = 
-        #     return ["Please reply with the number corresponding to the reason for reporting this post:" + "\n" + "1. Hate Speech" / "2. Nudity or Sexual Activity" / "3. Harassment" / "4. Imminent Danger"]
-        
+            self.author = message.author.name
+            self.messageContent = message.content
+            
+            return ["I found this message:", "```" + message.author.name + ": " + message.content + "```" + "\n" + 
+                    "Are you sure this is the message you would like to report?", 
+                    "Otherwise, this report will be cancelled."]
+        # User has been asked to confirm whether this is the message they actually want to report
+        if self.state == State.MESSAGE_IDENTIFIED:
+            # Prompt to user to select the type of harassment
+            if message.content[0] in ["y", "Y"]:
+                self.state = State.SELECTING
+                return ["Please reply with the number corresponding to the reason for reporting this post:" + 
+                        "\n1. Hate Speech" + "\n2. Nudity or Sexual Activity" + "\n3. Harassment" + "\n4. Imminent Danger"]
+            # User decided not to report this message/user
+            else:
+                self.state = State.REPORT_COMPLETE
+                return ["Report cancelled."]
         # User selected abuse type
         if self.state == State.SELECTING:
-            self.reportInfo["Reason"] = message.content
+            self.reason = message.content
             # User selects Hate Speech
             if (message.content == "1"):
                 self.state = State.CATEGORY
@@ -84,15 +97,14 @@ class Report:
                         "4. The username is vulgar or inappropriate" + "\n" + "5. This content is part of a raid" ]
             # Everything else
             else:
-                await self.forwardToMods(self.reportInfo, mod_channels)
+                await self.forwardToMods(mod_channels)
                 self.state = State.BLOCK
                 return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user?"]
-        
         # User selects Hate Speech type: 1: Deadnaming, 2: Misgendering, 3: Slurs
         if self.state == State.CATEGORY:
-            self.reportInfo["Category"] = message.content
-            if (message.content == "1" or message.content == "2" or message.content == "3"): 
-                await self.forwardToMods(self.reportInfo, mod_channels)
+            self.category = message.content
+            if message.content in ["1", "2", "3"]: 
+                await self.forwardToMods(mod_channels)
                 self.state = State.BLOCK
                 return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user?"]
             # Vulgar / Inappropriate username
@@ -103,30 +115,39 @@ class Report:
             if (message.content == "5"):
                 self.state = State.RAID
                 return ["Is this user a repeat offender or have they been a part of other raids?"]
-        
+        # Prompt the user to describe the issue with this person's username
         if self.state == State.DESCRIBE_ISSUE:
-            self.reportInfo["Described Issue"] = message.content
-            await self.forwardToMods(self.reportInfo, mod_channels)
+            self.usernameIssue = message.content
+            await self.forwardToMods(mod_channels)
             self.state = State.BLOCK
             return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user?"]
+        # Prompt the user to answer whether this person is a repeat offender or not
         if self.state == State.RAID:
-            self.reportInfo["Repeat Offender"] = message.content
-            await self.forwardToMods(self.reportInfo, mod_channels)
+            self.repeatOffender = (message.content[0] in ["y", "Y"])
+            await self.forwardToMods(mod_channels)
             self.state = State.BLOCK
             return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user?"]
+        # User has blocked another user, conclude user reporting flow
         if self.state == State.BLOCK:
-            if message.content[0] == "y" or message.content[0] == "Y":
-                # block
+            if message.content[0] in ["y", "Y"]:
                 self.state = State.REPORT_COMPLETE
                 return ["The user has been blocked. Thank you for reporting."]
             else:
                 self.state = State.REPORT_COMPLETE
                 return ["Thank you for reporting."]   
             
-    async def forwardToMods(self, reportInfo, mod_channels):
+    async def forwardToMods(self, mod_channels):
         message = self.message
         mod_channel = mod_channels[message.guild.id]
-        await mod_channel.send(f'Forwarded:\n{reportInfo}')
+
+        # A dictionary of relevant report information
+        reportInfo = {"Author": self.author,
+                          "Message Content": self.messageContent,
+                          "Report Reason:": self.reason,
+                          "Abuse Category": self.category,
+                          "Username Issue" : self.usernameIssue,
+                          "Repeat Offender": self.repeatOffender}
+        await mod_channel.send(reportInfo)
         #scores = self.eval_text(message.content)
         #await mod_channel.send(self.code_format(scores))
         

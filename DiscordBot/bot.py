@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import requests
-from DiscordBot.report import Report
+from report import Report
 import pdb
 
 # Set up logging to the console
