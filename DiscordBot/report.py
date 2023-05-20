@@ -2,6 +2,7 @@ from enum import Enum, auto
 import discord
 import re
 import json
+from unidecode import unidecode
 
 class State(Enum):
     # User-side states for a report
@@ -43,6 +44,7 @@ class Report:
         self.category = None
         self.usernameIssue = None
         self.repeatOffender = False
+        self.decodedMessage = None
     
     async def handle_message(self, message, mod_channels):
         '''
@@ -83,6 +85,9 @@ class Report:
             self.message = message
             self.author = message.author.name
             self.messageContent = message.content
+
+            self.decodedMessage = self.messageContent.encode('utf-8').decode('unicode-escape')
+            print(self.decodedMessage)
             
             return ["I found this message:", "```" + message.author.name + ": " + message.content + "```" + "\n" + 
                     "Are you sure this is the message you would like to report?", 
@@ -155,6 +160,7 @@ class Report:
         reportInfo = {"Message": self.messageContent,
                       "Author": self.author,
                       "Message Content": self.messageContent,
+                      "Decoded Content": self.decodedMessage,
                       "Report Reason:": self.reason,
                       "Abuse Category": self.category,
                       "Username Issue" : self.usernameIssue,
@@ -179,6 +185,7 @@ class ModReview:
         self.report_dict = {"Message": report.messageContent,
                       "Author": report.author,
                       "Message Content": report.messageContent,
+                      "Decoded Content": report.decodedMessage,
                       "Report Reason:": report.reason,
                       "Abuse Category": report.category,
                       "Username Issue" : report.usernameIssue,
