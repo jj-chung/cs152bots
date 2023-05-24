@@ -130,22 +130,15 @@ class ModBot(discord.Client):
         author_id = message.author.id
         responses = []
 
-        print(author_id)
-        
-        print("responding")
-
         # If we don't currently have an active review for this moderator, add one
         if author_id not in self.mod_reviews:
             self.mod_reviews[author_id].append(ModReview(self, self.currReport))
 
-        print("added mod")
-
         # Let the review class handle this message; forward all the messages it returns to uss
         for review in self.mod_reviews[author_id]:
             responses = await review.handle_mod_message(message, self.mod_channels)
-            print("responses", responses)
+            
             for r in responses:
-                print("response", r)
                 await message.channel.send(r)
 
         # If the report is complete or cancelled, remove it from our map

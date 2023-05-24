@@ -25,6 +25,7 @@ class State(Enum):
     REPEAT_OFFENDER = auto()
     REMOVE_MESSAGE = auto()
     REVIEW_COMPLETE = auto()
+    ADVERSARIAL = auto()
 
 class Report:
     START_KEYWORD = "report"
@@ -87,7 +88,6 @@ class Report:
             self.messageContent = message.content
 
             self.decodedMessage = self.messageContent.encode('utf-8').decode('unicode-escape')
-            print(self.decodedMessage)
             
             return ["I found this message:", "```" + message.author.name + ": " + message.content + "```" + "\n" + 
                     "Are you sure this is the message you would like to report?", 
@@ -168,28 +168,11 @@ class Report:
             if message.content[0] in ["y", "Y"]:
                 self.state = State.REPORT_COMPLETE
                 return ["The user has been blocked. ", "Thank you for reporting. Our content moderation team will review the ",
-                        "content and email you an update once we decide on appropriate action. This may include content and/or account removal.”"]
+                        "content and email you an update once we decide on appropriate action. This may include content and/or account removal."]
             else:
                 self.state = State.REPORT_COMPLETE
                 return ["Thank you for reporting. Our content moderation team will review the ",
                         "content and email you an update once we decide on appropriate action. This may include content and/or account removal."]   
-            
-    async def forwardToMods(self, mod_channels):
-        message = self.message
-        mod_channel = mod_channels[message.guild.id]
-
-        # A dictionary of relevant report information
-        reportInfo = {"Message": self.messageContent,
-                      "Author": self.author,
-                      "Message Content": self.messageContent,
-                      "Decoded Content": self.decodedMessage,
-                      "Report Reason:": self.reason,
-                      "Abuse Category": self.category,
-                      "Username Issue" : self.usernameIssue,
-                      "Repeat Offender": self.repeatOffender}
-        # await mod_channel.send(reportInfo)
-        #scores = self.eval_text(message.content)
-        #await mod_channel.send(self.code_format(scores))
         
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
@@ -235,8 +218,20 @@ class ModReview:
                 self.state = State.DANGER
                 return ["Does this report indicate a user is in imminent danger?"]
             else:
+                self.state = State.ADVERSARIAL
+                return ["Is this a case of adversarial flagging?"]
+        if self.state == State.ADVERSARIAL:
+            if message.content in ["y", "Y"]:
+                self.state = State.ROUTINE
+                return ["Is harassment routine (over frequent reporting from one user) or is it coordinated (one user reported by many users)?"]
+            else:
+                return ["Thank you. This review is complete."]
+        if self.state == State.ROUTINE:
+            if message.content in ["y", "Y"]:
                 self.state = State.REVIEW_COMPLETE
-                return ["No further action is required."]
+                return ["The user has been temporarily banned and flagged for violating Community Guidelines."]
+            else:
+                return ["Thank you. This review is complete."]
         # Determine if this person is in danger
         if self.state == State.DANGER:
             # There is imminent danger
