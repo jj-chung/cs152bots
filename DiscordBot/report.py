@@ -138,7 +138,7 @@ class Report:
             else:
                 category = "hate speech"
 
-            confirmation_msg = f'You are about to report this content for {category}. \n'
+            confirmation_msg = f'You are about to report this content for {category}. Please select \'cancel\' if this report was made in error.\n'
             if message.content in ["1", "2", "3"]: 
                 await self.forwardToMods(mod_channels)
                 self.state = State.BLOCK
