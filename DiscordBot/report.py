@@ -177,6 +177,23 @@ class Report:
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
     
+    async def forwardToMods(self, mod_channels):
+        message = self.message
+        mod_channel = mod_channels[message.guild.id]
+
+        # A dictionary of relevant report information
+        reportInfo = {"Message": self.messageContent,
+                      "Author": self.author,
+                      "Message Content": self.messageContent,
+                      "Decoded Content": self.decodedMessage,
+                      "Report Reason:": self.reason,
+                      "Abuse Category": self.category,
+                      "Username Issue" : self.usernameIssue,
+                      "Repeat Offender": self.repeatOffender}
+        # await mod_channel.send(reportInfo)
+        #scores = self.eval_text(message.content)
+        #await mod_channel.send(self.code_format(scores)
+    
 class ModReview:
     START_REVIEW_KEYWORD = "review"
     DISMISS_KEYWORD = "dismiss"
