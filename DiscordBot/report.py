@@ -109,8 +109,12 @@ class Report:
             # User selects Hate Speech
             if (message.content == "1"):
                 self.state = State.CATEGORY
-                return ["Please select the category of hate speech this post falls into." + "\n" + "1. The content includes deadnaming" + "\n" + "2. The content misgenders someone" + "\n" + "3. The content includes a slur" + "\n" +
-                        "4. The username is vulgar or inappropriate" + "\n" + "5. This content is part of a raid" ]
+                return ["Please select the category of hate speech this post falls into." + "\n" + 
+                        "1. The content includes deadnaming" + "\n" + 
+                        "2. The content misgenders someone" + "\n" +
+                        "3. The content includes a slur" + "\n" +
+                        "4. The username is vulgar or inappropriate" + "\n" + 
+                        "5. This content is part of a raid" ]
             # Everything else
             else:
                 await self.forwardToMods(mod_channels)
@@ -119,38 +123,56 @@ class Report:
         # User selects Hate Speech type: 1: Deadnaming, 2: Misgendering, 3: Slurs
         if self.state == State.CATEGORY:
             self.category = message.content
+            category = None
+            if message.content == "1": 
+                category = "deadnaming"
+            elif message.content == "2":
+                category = "misgendering"
+            elif message.content == "3":
+                category = "using a slur"
+            elif message.content == "4":
+                category = "using an inappropriate username"
+            elif message.content == "5":
+                category = "being part of a raid"
+            else:
+                category = "hate speech"
+
+            confirmation_msg = f'You are about to report this content for {category}. \n'
             if message.content in ["1", "2", "3"]: 
                 await self.forwardToMods(mod_channels)
                 self.state = State.BLOCK
-                return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user?"]
+                return [confirmation_msg, "We have forwarded the information to our moderator team." + "\n" + "“Would you like to block this user to prevent them from sending  you more messages in the future?"]
             # Vulgar / Inappropriate username
             if (message.content == "4"):
                 self.state = State.DESCRIBE_ISSUE
-                return ["Please describe the issue with this user's username."]
+                return ["Please briefly describe the issue with this user's username."]
             # Raid
             if (message.content == "5"):
                 self.state = State.RAID
-                return ["Is this user a repeat offender or have they been a part of other raids?"]
+                return ["To your knowledge, has this user a repeat offender or been a part of other raids? ",
+                            "If unsure, please select \'no.\'"]
         # Prompt the user to describe the issue with this person's username
         if self.state == State.DESCRIBE_ISSUE:
             self.usernameIssue = message.content
             await self.forwardToMods(mod_channels)
             self.state = State.BLOCK
-            return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user?"]
+            return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user to prevent them from sending you more messages in the future?"]
         # Prompt the user to answer whether this person is a repeat offender or not
         if self.state == State.RAID:
             self.repeatOffender = (message.content[0] in ["y", "Y"])
             await self.forwardToMods(mod_channels)
             self.state = State.BLOCK
-            return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user?"]
+            return ["We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user to prevent them from sending you more messages in the future?"]
         # User has blocked another user, conclude user reporting flow
         if self.state == State.BLOCK:
             if message.content[0] in ["y", "Y"]:
                 self.state = State.REPORT_COMPLETE
-                return ["The user has been blocked. Thank you for reporting."]
+                return ["The user has been blocked. ", "Thank you for reporting. Our content moderation team will review the ",
+                        "content and email you an update once we decide on appropriate action. This may include content and/or account removal.”"]
             else:
                 self.state = State.REPORT_COMPLETE
-                return ["Thank you for reporting."]   
+                return ["Thank you for reporting. Our content moderation team will review the ",
+                        "content and email you an update once we decide on appropriate action. This may include content and/or account removal."]   
             
     async def forwardToMods(self, mod_channels):
         message = self.message
@@ -237,7 +259,8 @@ class ModReview:
                     return ["The user has been permanently banned."]
                 if category == "5":
                     self.state = State.REPEAT_OFFENDER
-                    return ["Is this user a repeat offender (raids)?"]
+                    return ["To your knowledge, has this user a repeat offender or been a part of other raids? ",
+                            "If unsure, please select \'no.\'"]
         if self.state == State.OTHER_VIOLATIONS:
             if message.content[0] in ["y", "Y"]:
                 self.state = State.REVIEW_COMPLETE
