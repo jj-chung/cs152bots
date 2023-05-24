@@ -26,6 +26,7 @@ class State(Enum):
     REMOVE_MESSAGE = auto()
     REVIEW_COMPLETE = auto()
     ADVERSARIAL = auto()
+    ROUTINE = auto()
 
 class Report:
     START_KEYWORD = "report"
