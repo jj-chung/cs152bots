@@ -142,7 +142,7 @@ class Report:
             if message.content in ["1", "2", "3"]: 
                 await self.forwardToMods(mod_channels)
                 self.state = State.BLOCK
-                return [confirmation_msg, "We have forwarded the information to our moderator team." + "\n" + "“Would you like to block this user to prevent them from sending  you more messages in the future?"]
+                return [confirmation_msg, "We have forwarded the information to our moderator team." + "\n" + "Would you like to block this user to prevent them from sending  you more messages in the future?"]
             # Vulgar / Inappropriate username
             if (message.content == "4"):
                 self.state = State.DESCRIBE_ISSUE
@@ -150,7 +150,7 @@ class Report:
             # Raid
             if (message.content == "5"):
                 self.state = State.RAID
-                return ["To your knowledge, has this user a repeat offender or been a part of other raids? ",
+                return ["To your knowledge, has this user a repeat offender or been a part of other raids? " + 
                             "If unsure, please select \'no.\'"]
         # Prompt the user to describe the issue with this person's username
         if self.state == State.DESCRIBE_ISSUE:
@@ -168,11 +168,11 @@ class Report:
         if self.state == State.BLOCK:
             if message.content[0] in ["y", "Y"]:
                 self.state = State.REPORT_COMPLETE
-                return ["The user has been blocked. ", "Thank you for reporting. Our content moderation team will review the ",
+                return ["The user has been blocked. ", "Thank you for reporting. Our content moderation team will review the " + 
                         "content and email you an update once we decide on appropriate action. This may include content and/or account removal."]
             else:
                 self.state = State.REPORT_COMPLETE
-                return ["Thank you for reporting. Our content moderation team will review the ",
+                return ["Thank you for reporting. Our content moderation team will review the " + 
                         "content and email you an update once we decide on appropriate action. This may include content and/or account removal."]   
         
     def report_complete(self):

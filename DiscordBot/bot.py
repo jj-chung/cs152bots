@@ -96,7 +96,7 @@ class ModBot(discord.Client):
         if author_id not in self.reports:
             self.reports[author_id] = Report(self)
 
-        # Let the report class handle this message; forward all the messages it returns to uss
+        # Let the report class handle this message; forward all the messages it returns to us
         responses = await self.reports[author_id].handle_message(message, self.mod_channels)
         for r in responses:
             await message.channel.send(r)
@@ -137,7 +137,7 @@ class ModBot(discord.Client):
         # Let the review class handle this message; forward all the messages it returns to uss
         for review in self.mod_reviews[author_id]:
             responses = await review.handle_mod_message(message, self.mod_channels)
-            
+
             for r in responses:
                 await message.channel.send(r)
 
