@@ -11,6 +11,10 @@ from report import ModReview
 import pdb
 from collections import defaultdict
 
+# Packages for automated section (Milestone 3)
+import openai 
+from googleapiclient import discovery
+
 # Set up logging to the console
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -26,6 +30,8 @@ with open(token_path) as f:
     # If you get an error here, it means your token is formatted incorrectly. Did you put it in quotes?
     tokens = json.load(f)
     discord_token = tokens['discord']
+    open_ai_key = tokens['open_ai_key']
+    perspective_ai_key = tokens['perspective_ai_key']
 
 
 class ModBot(discord.Client):
@@ -112,10 +118,20 @@ class ModBot(discord.Client):
             return
 
         # Forward the message to the mod channel
-        mod_channel = self.mod_channels[message.guild.id]
-        await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
-        scores = self.eval_text(message.content)
-        await mod_channel.send(self.code_format(scores))
+        # mod_channel = self.mod_channels[message.guild.id]
+        # await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
+        # scores = self.eval_text(message.content)
+        # await mod_channel.send(self.code_format(scores))
+
+        # Open ai evaluation
+        # isToxic_open_ai, report_open_ai = self.eval_text_open_ai(message)
+        # if isToxic_open_ai:
+        #    await self.handle_mod_channel_message(message, "start", report_open_ai)
+
+        # Perspective ai evaluation
+        isToxic_perspective_ai, report_perspective_ai = self.eval_text_perspective_ai(message)
+        if isToxic_perspective_ai:
+            await self.handle_mod_channel_message(message, "start", report_perspective_ai)
 
     async def handle_mod_channel_message(self, message, keyword="", report=None):
         mod_channel = self.mod_channels[1103033282779676743]
@@ -155,12 +171,183 @@ class ModBot(discord.Client):
             # Otherwise, update the number of remainining reports they have
             self.mod_reviews[author_id] = remaining_mod_reviews
     
-    def eval_text(self, message):
+    def eval_text_perspective_ai(self, message):
         ''''
-        TODO: Once you know how you want to evaluate messages in your channel, 
-        insert your code here! This will primarily be used in Milestone 3. 
+        Evaluate whether a message is toxic or not and send the message info along if it is.
         '''
-        return message
+        report = Report(self)
+        report.messageContent = message.content
+        report.author = message.author.name
+        report.decodedMessage = report.messageContent.encode('utf-8').decode('unicode-escape')
+        report.repeatOffender = False
+
+        API_KEY = perspective_ai_key
+
+        client = discovery.build(
+            "commentanalyzer",
+            "v1alpha1",
+            developerKey=API_KEY,
+            discoveryServiceUrl="https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1",
+            static_discovery=False,
+        )
+
+
+        analyze_content_request = {
+            'comment': { 'text': message.content },
+            'requestedAttributes': {'TOXICITY': {}, 
+                                    'SEVERE_TOXICITY': {},
+                                    'IDENTITY_ATTACK': {},
+                                    'INSULT' : {},
+                                    'PROFANITY' : {},
+                                    'THREAT' : {},
+                                    'SEXUALLY_EXPLICIT': {}
+                                    }
+        }
+
+        response_content = client.comments().analyze(body=analyze_content_request).execute()
+
+        categoryScores = {}
+        for category, value in response_content["attributeScores"].items():
+            categoryScores[category] = value["summaryScore"]["value"]
+
+        maxCategory = max(categoryScores, key=categoryScores.get)
+        summaryScore = response_content["attributeScores"][maxCategory]["summaryScore"]["value"]
+        is_content_toxic = summaryScore > 0.6
+
+        if is_content_toxic:
+            if maxCategory == "IDENTITY_ATTACK":
+                report.reason = "1"
+            elif maxCategory == "SEXUALLY_EXPLICIT":
+                report.reason = "2"
+            elif maxCategory == "IMMINENT_DANGER":
+                report.reason = "4"
+            else:
+                report.reason = "3"
+
+        """
+        analyze_username_request = {
+            'comment': { 'text': message.author.name },
+            'requestedAttributes': {'TOXICITY': {}, 
+                                    'SEVERE_TOXICITY': {},
+                                    'IDENTITY_ATTACK': {},
+                                    'INSULT' : {},
+                                    'PROFANITY' : {},
+                                    'THREAT' : {},
+                                    'SEXUALLY_EXPLICIT': {},
+                                    'FLIRTATION': {}
+                                    }
+        }
+        response_username = client.comments().analyze(body=analyze_username_request).execute()
+        summaryScore = response_content["attributeScores"]["summaryScore"]["value"]
+        is_username_toxic = summaryScore > 0.6
+
+        if is_username_toxic:
+            report.reason
+            """
+
+        return is_content_toxic, report
+
+    def eval_text_open_ai(self, message):
+        ''''
+        Evaluate whether a message is toxic or not and send the message info along if it is.
+        '''
+        isToxic = True
+        report = Report(self)
+        report.messageContent = message.content
+        report.author = message.author.name
+        report.decodedMessage = report.messageContent.encode('utf-8').decode('unicode-escape')
+        report.repeatOffender = False
+
+        # openai.organization = "org-YVZe9QFuR0Ke0J0rqr7l2R2L"
+        openai.api_key = open_ai_key
+        print(openai.Model.list()) # Can used to verify GPT-4 access
+
+        # Ask gpt-4 whether a message is toxic and what category a message belongs to (high-level, not limited to hate speech)
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+            {"role": "system", "content": "You are a message moderation system on twitch. Classify each message as toxic (True)" + 
+             "or non-toxic (False). If it is toxic, then choose the correct category out of 1. Transphobic Hate Speech" + "\n2. Nudity or Sexual Activity" + 
+             "\n3. Harassment" + "\n4. Imminent Danger. Category 1 (Hate Speech) includes deadnaming, use of transphobic slurs, and misgendering."},
+            {"role": "user", "content": "user123: I love puppies"},
+            {"role": "assistant", "content": "False, None"},
+            {"role": "user", "content": ""},
+            {"role": "assistant", "content": "True, 1"},
+            {"role": "user", "content": ""},
+            {"role": "assistant", "content": "True, 2"},
+            {"role": "user", "content": ""},
+            {"role": "assistant", "content": "True, 3"},
+            {"role": "user", "content": ""},
+            {"role": "assistant", "content": "True, 4"},
+            {"role": "user", "content": ""},
+            {"role": "assistant", "content": "True, 5"},
+            {"role": "user", "content": f"{message.author.name}: {message.content}"}
+            ]
+        )
+
+        # Save the high-level category in the report information
+        output = response['choices'][0]['message']['content']
+        output = output.split(", ")
+        isToxic = output[0] == "True"
+        isHateSpeech = output[1] == "1"
+        report.reason = output[1]
+
+        # If the category is hate-speech, ask what the lower-level category of hate speech is?
+        if isHateSpeech:
+            # If gpt-4 determines it's hate speech, ask it to fill out some information
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                {"role": "system", "content": "Which category does the hate spech fall into?" +
+                        "1. The content includes deadnaming" + "\n" + 
+                        "2. The content misgenders someone" + "\n" +
+                        "3. The content includes a slur"
+                        "4. The content is non-toxic"},
+                {"role": "user", "content": ""},
+                {"role": "assistant", "content": "1"},
+                {"role": "user", "content": ""},
+                {"role": "assistant", "content": "2"},
+                {"role": "user", "content": ""},
+                {"role": "assistant", "content": "3"},
+                {"role": "user", "content": message.content},
+                ]
+            )
+
+            report.category = response['choices'][0]['message']['content']
+
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                {"role": "system", "content": "True/False: This username is vulgar/inappropriate."},
+                {"role": "user", "content": ""},
+                {"role": "assistant", "content": "True"},
+                {"role": "user", "content": ""},
+                {"role": "assistant", "content": "False"},
+                {"role": "user", "content": ""},
+                {"role": "assistant", "content": "False"},
+                {"role": "user", "content": message.author.name},
+                ]
+            )
+
+            output = response['choices'][0]['message']['content']
+            output = output == "True"
+
+            if output:
+                # If gpt-4 determines it's hate speech, ask it to fill out some information
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=[
+                    {"role": "system", "content": "Describe the issue with the twitch account username."},
+                    {"role": "user", "content": ""},
+                    {"role": "assistant", "content": ""},
+                    {"role": "user", "content": ""},
+                    {"role": "assistant", "content": ""},
+                    {"role": "user", "content": message.author.name},
+                    ]
+                )
+                report.usernameIssue = response['choices'][0]['message']['content']
+        
+        return isToxic, report
 
     
     def code_format(self, text):

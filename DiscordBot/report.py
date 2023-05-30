@@ -4,6 +4,7 @@ import re
 import json
 from unidecode import unidecode
 
+
 class State(Enum):
     # User-side states for a report
     REPORT_START = auto()
@@ -187,7 +188,7 @@ class Report:
                       "Author": self.author,
                       "Message Content": self.messageContent,
                       "Decoded Content": self.decodedMessage,
-                      "Report Reason:": self.reason,
+                      "Report Reason": self.reason,
                       "Abuse Category": self.category,
                       "Username Issue" : self.usernameIssue,
                       "Repeat Offender": self.repeatOffender}
@@ -207,7 +208,6 @@ class ModReview:
         self.report = report
         self.report_dict = {"Message": report.messageContent,
                       "Author": report.author,
-                      "Message Content": report.messageContent,
                       "Decoded Content": report.decodedMessage,
                       "Report Reason:": report.reason,
                       "Abuse Category": report.category,
