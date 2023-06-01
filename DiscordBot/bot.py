@@ -43,7 +43,9 @@ class ModBot(discord.Client):
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
         self.mod_reviews = defaultdict(list) # Map from mod IDs to the state of the reports they're working on
-        self.currReport = None
+        self.currReport = None # The current report being passed through the flow
+        self.userStatsFile = "./userStatistics.json" # User statistics for how many times a user has been reported
+        self.regexes = {}
 
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
@@ -88,19 +90,21 @@ class ModBot(discord.Client):
         if message.content == Report.HELP_KEYWORD:
             reply =  "Use the `report` command to begin the reporting process.\n"
             reply += "Use the `cancel` command to cancel the report process.\n"
+            reply += "Use the `ban` command to start the process for banning a regex from a channel.\n"
             await message.channel.send(reply)
             return
 
         author_id = message.author.id
         responses = []
 
-        # Only respond to messages if they're part of a reporting flow
-        if author_id not in self.reports and not message.content.startswith(Report.START_KEYWORD):
-            return
+        if message.content != Report.BAN_REGEX_KEYWORD:
+            # Only respond to messages if they're part of a reporting flow
+            if author_id not in self.reports and not message.content.startswith(Report.START_KEYWORD):
+                return
 
         # If we don't currently have an active report for this user, add one
         if author_id not in self.reports:
-            self.reports[author_id] = Report(self)
+            self.reports[author_id] = Report(self, self.regexes)
 
         # Let the report class handle this message; forward all the messages it returns to us
         responses = await self.reports[author_id].handle_message(message, self.mod_channels)
@@ -116,6 +120,19 @@ class ModBot(discord.Client):
         # Only handle messages sent in the "group-#" channel
         if not message.channel.name == f'group-{self.group_num}':
             return
+        
+        # Check if the message for this channel matches any of the specific regexes
+        for channel, regex in self.regexes.items():
+            if channel == f'group-{self.group_num}':
+                print(message.content)
+                print(regex)
+                pattern = re.compile(regex)
+                matched = re.search(pattern, message.content) != None
+                print(matched)
+
+                if matched:
+                    await message.delete()
+                    await message.channel.send("This message has been removed for violating the channel's guidelines.")
 
         # Forward the message to the mod channel
         # mod_channel = self.mod_channels[message.guild.id]
@@ -126,11 +143,13 @@ class ModBot(discord.Client):
         # Open ai evaluation
         # isToxic_open_ai, report_open_ai = self.eval_text_open_ai(message)
         # if isToxic_open_ai:
+        #    print('OPEN AI HANDLING')
         #    await self.handle_mod_channel_message(message, "start", report_open_ai)
 
         # Perspective ai evaluation
         isToxic_perspective_ai, report_perspective_ai = self.eval_text_perspective_ai(message)
         if isToxic_perspective_ai:
+            print('PERSPECTIVE AI HANDLING')
             await self.handle_mod_channel_message(message, "start", report_perspective_ai)
 
     async def handle_mod_channel_message(self, message, keyword="", report=None):
@@ -148,7 +167,7 @@ class ModBot(discord.Client):
 
         # If we don't currently have an active review for this moderator, add one
         if author_id not in self.mod_reviews:
-            self.mod_reviews[author_id].append(ModReview(self, self.currReport))
+            self.mod_reviews[author_id].append(ModReview(self, self.currReport, self.userStatsFile))
 
         # Let the review class handle this message; forward all the messages it returns to uss
         for review in self.mod_reviews[author_id]:
@@ -177,6 +196,7 @@ class ModBot(discord.Client):
         '''
         report = Report(self)
         report.messageContent = message.content
+        report.message = message
         report.author = message.author.name
         report.decodedMessage = report.messageContent.encode('utf-8').decode('unicode-escape')
         report.repeatOffender = False
@@ -254,13 +274,14 @@ class ModBot(discord.Client):
         isToxic = True
         report = Report(self)
         report.messageContent = message.content
+        report.message = message
         report.author = message.author.name
         report.decodedMessage = report.messageContent.encode('utf-8').decode('unicode-escape')
         report.repeatOffender = False
 
-        # openai.organization = "org-YVZe9QFuR0Ke0J0rqr7l2R2L"
+        openai.organization = "org-YVZe9QFuR0Ke0J0rqr7l2R2L"
         openai.api_key = open_ai_key
-        print(openai.Model.list()) # Can used to verify GPT-4 access
+        # print(openai.Model.list()) # Can used to verify GPT-4 access
 
         # Ask gpt-4 whether a message is toxic and what category a message belongs to (high-level, not limited to hate speech)
         response = openai.ChatCompletion.create(
@@ -347,6 +368,7 @@ class ModBot(discord.Client):
                 )
                 report.usernameIssue = response['choices'][0]['message']['content']
         
+        print(report)
         return isToxic, report
 
     

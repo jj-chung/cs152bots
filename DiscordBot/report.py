@@ -28,13 +28,17 @@ class State(Enum):
     REVIEW_COMPLETE = auto()
     ADVERSARIAL = auto()
     ROUTINE = auto()
+    FILLED_CATEGORY = auto()
+    BAN_REGEX = auto()
+    ASK_REGEX = auto()
 
 class Report:
     START_KEYWORD = "report"
     CANCEL_KEYWORD = "cancel"
     HELP_KEYWORD = "help"
+    BAN_REGEX_KEYWORD = "ban"
 
-    def __init__(self, client):
+    def __init__(self, client, regexes = {}):
         self.state = State.REPORT_START
         self.client = client
         self.message = ""
@@ -48,6 +52,8 @@ class Report:
         self.usernameIssue = None
         self.repeatOffender = False
         self.decodedMessage = None
+        self.regexes = regexes
+        self.regex = None
     
     async def handle_message(self, message, mod_channels):
         '''
@@ -55,6 +61,18 @@ class Report:
         prompts to offer at each of those states. You're welcome to change anything you want; this skeleton is just here to
         get you started and give you a model for working with Discord. 
         '''
+        if message.content == self.BAN_REGEX_KEYWORD:
+            self.state = State.ASK_REGEX
+            return ["Please enter the regex you want to ban."]
+        if self.state == State.ASK_REGEX:
+            self.state = State.BAN_REGEX
+            self.regex = message.content
+            return ["Please enter the channel name you want to ban the regex from."]
+        if self.state == State.BAN_REGEX:
+            self.state = State.REPORT_COMPLETE
+            self.regexes[message.content] = self.regex
+            return ["The regex has been banned from the specified channel. "]
+
         if message.content == self.CANCEL_KEYWORD:
             self.state = State.REPORT_COMPLETE
             return ["Report cancelled."]
@@ -200,9 +218,11 @@ class ModReview:
     START_REVIEW_KEYWORD = "review"
     DISMISS_KEYWORD = "dismiss"
 
-    def __init__(self, client, report):
+    def __init__(self, client, report, userStats):
         self.state = State.REVIEW_START
         self.client = client
+        self.userStats = userStats
+        self.threshold = 3
 
         # Report information sent to the moderating channel
         self.report = report
@@ -234,6 +254,20 @@ class ModReview:
         if self.state == State.HARASSMENT:
             if message.content[0] in ["y", "Y"]:
                 self.state = State.DANGER
+                
+                userStatsDict = {}
+                with open(self.userStats) as userStats:
+                    userStatsDict = json.load(userStats)
+                    userStatsDict[message.author.name] = userStatsDict.get(message.author.name, 0) + 1
+
+                    # If the user has been a perpetrator more than the allotted number of times,
+                    # permanently ban them
+                    if userStatsDict[message.author.name] >= self.threshold:
+                        return ["The user has been permanently banned for surpassing the number of allowed violations."]
+                    
+                with open(self.userStats, 'w') as userStats:
+                    json.dump(userStatsDict, userStats)
+
                 return ["Does this report indicate a user is in imminent danger?"]
             else:
                 self.state = State.ADVERSARIAL
@@ -257,23 +291,51 @@ class ModReview:
                 self.state = State.REVIEW_COMPLETE
                 return ["The authorities have been contacted with this user's details."]
             # No imminent danger, case states on category of the report
+            
             else:
                 category = self.report.category
-                # Misgendering, Deadnaming, or 
+                # Misgendering, Deadnaming, or slurs
                 if category in ["1", "2", "3"]:
                     # Remove the original message
-                    await self.report.message.delete()
+                    await self.report.message.channel.send("This message has been removed for violating Twitch's guidelines.")
 
                     # Check if the user has other violations
                     self.state = State.OTHER_VIOLATIONS
                     return ["The message has been removed. Does the user have other violations?"]
-                if category == "4":
+                elif category == "4":
                     self.state = State.REVIEW_COMPLETE
                     return ["The user has been permanently banned."]
-                if category == "5":
+                elif category == "5":
                     self.state = State.REPEAT_OFFENDER
                     return ["To your knowledge, has this user a repeat offender or been a part of other raids? ",
                             "If unsure, please select \'no.\'"]
+                else:
+                    if category is None:
+                        # This report does not have the category included
+                        self.state = State.FILLED_CATEGORY
+                        return ["Please select the category of hate speech this post falls into." + "\n" + 
+                            "1. The content includes deadnaming" + "\n" + 
+                            "2. The content misgenders someone" + "\n" +
+                            "3. The content includes a slur" + "\n" +
+                            "4. The username is vulgar or inappropriate" + "\n" + 
+                            "5. This content is part of a raid" ]
+        if self.state == State.FILLED_CATEGORY:
+            category = message.content
+            # Misgendering, Deadnaming, or slurs
+            if category in ["1", "2", "3"]:
+                # Remove the original message
+                await self.report.message.delete()
+
+                # Check if the user has other violations
+                self.state = State.OTHER_VIOLATIONS
+                return ["The message has been removed. Does the user have other violations?"]
+            if category == "4":
+                self.state = State.REVIEW_COMPLETE
+                return ["The user has been permanently banned."]
+            if category == "5":
+                self.state = State.REPEAT_OFFENDER
+                return ["To your knowledge, has this user a repeat offender or been a part of other raids? ",
+                        "If unsure, please select \'no.\'"]
         if self.state == State.OTHER_VIOLATIONS:
             if message.content[0] in ["y", "Y"]:
                 self.state = State.REVIEW_COMPLETE
