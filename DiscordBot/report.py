@@ -229,7 +229,7 @@ class ModReview:
         self.report_dict = {"Message": report.messageContent,
                       "Author": report.author,
                       "Decoded Content": report.decodedMessage,
-                      "Report Reason:": report.reason,
+                      "Report Reason": report.reason,
                       "Abuse Category": report.category,
                       "Username Issue" : report.usernameIssue,
                       "Repeat Offender": report.repeatOffender}
@@ -293,32 +293,38 @@ class ModReview:
             # No imminent danger, case states on category of the report
             
             else:
-                category = self.report.category
-                # Misgendering, Deadnaming, or slurs
-                if category in ["1", "2", "3"]:
-                    # Remove the original message
-                    await self.report.message.channel.send("This message has been removed for violating Twitch's guidelines.")
+                # If the high-level reason for the report is hate speech, then proceed, otherwise 
+                # finish the report
+                if self.report.reason == "1":
+                    category = self.report.category
+                    # Misgendering, Deadnaming, or slurs
+                    if category in ["1", "2", "3"]:
+                        # Remove the original message
+                        await self.report.message.channel.send("This message has been removed for violating Twitch's guidelines.")
 
-                    # Check if the user has other violations
-                    self.state = State.OTHER_VIOLATIONS
-                    return ["The message has been removed. Does the user have other violations?"]
-                elif category == "4":
-                    self.state = State.REVIEW_COMPLETE
-                    return ["The user has been permanently banned."]
-                elif category == "5":
-                    self.state = State.REPEAT_OFFENDER
-                    return ["To your knowledge, has this user a repeat offender or been a part of other raids? ",
-                            "If unsure, please select \'no.\'"]
+                        # Check if the user has other violations
+                        self.state = State.OTHER_VIOLATIONS
+                        return ["The message has been removed. Does the user have other violations?"]
+                    elif category == "4":
+                        self.state = State.REVIEW_COMPLETE
+                        return ["The user has been permanently banned."]
+                    elif category == "5":
+                        self.state = State.REPEAT_OFFENDER
+                        return ["To your knowledge, has this user a repeat offender or been a part of other raids? ",
+                                "If unsure, please select \'no.\'"]
+                    else:
+                        if category is None:
+                            # This report does not have the category included
+                            self.state = State.FILLED_CATEGORY
+                            return ["Please select the category of hate speech this post falls into." + "\n" + 
+                                "1. The content includes deadnaming" + "\n" + 
+                                "2. The content misgenders someone" + "\n" +
+                                "3. The content includes a slur" + "\n" +
+                                "4. The username is vulgar or inappropriate" + "\n" + 
+                                "5. This content is part of a raid" ]
                 else:
-                    if category is None:
-                        # This report does not have the category included
-                        self.state = State.FILLED_CATEGORY
-                        return ["Please select the category of hate speech this post falls into." + "\n" + 
-                            "1. The content includes deadnaming" + "\n" + 
-                            "2. The content misgenders someone" + "\n" +
-                            "3. The content includes a slur" + "\n" +
-                            "4. The username is vulgar or inappropriate" + "\n" + 
-                            "5. This content is part of a raid" ]
+                    self.state = State.REPORT_COMPLETE
+                    return ["Thank you for reporting."]
         if self.state == State.FILLED_CATEGORY:
             category = message.content
             # Misgendering, Deadnaming, or slurs

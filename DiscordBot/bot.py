@@ -141,10 +141,10 @@ class ModBot(discord.Client):
         # await mod_channel.send(self.code_format(scores))
 
         # Open ai evaluation
-        # isToxic_open_ai, report_open_ai = self.eval_text_open_ai(message)
-        # if isToxic_open_ai:
-        #    print('OPEN AI HANDLING')
-        #    await self.handle_mod_channel_message(message, "start", report_open_ai)
+        isToxic_open_ai, report_open_ai = self.eval_text_open_ai(message)
+        if isToxic_open_ai:
+            print('OPEN AI HANDLING')
+            await self.handle_mod_channel_message(message, "start", report_open_ai)
 
         # Perspective ai evaluation
         isToxic_perspective_ai, report_perspective_ai = self.eval_text_perspective_ai(message)
@@ -368,7 +368,6 @@ class ModBot(discord.Client):
                 )
                 report.usernameIssue = response['choices'][0]['message']['content']
         
-        print(report)
         return isToxic, report
 
     
