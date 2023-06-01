@@ -294,6 +294,7 @@ class ModBot(discord.Client):
             {"role": "assistant", "content": "False, None"},
             {"role": "user", "content": "Transgender people are disgusting freaks and groomers who aren't real. " + 
              "They're bad for families and children. " + 
+             "I don't respect their pronouns. "
              "They don't deserve any rights or respect."},
             {"role": "assistant", "content": "True, 1"},
             {"role": "user", "content": "Can I get some nude pics? You should come over to my place for a good time"},
