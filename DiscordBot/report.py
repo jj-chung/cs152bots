@@ -295,7 +295,6 @@ class ModReview:
             else:
                 # If the high-level reason for the report is hate speech, then proceed, otherwise 
                 # finish the report
-                print("tested")
                 if self.report.reason == "1":
                     category = self.report.category
                     # Misgendering, Deadnaming, or slurs

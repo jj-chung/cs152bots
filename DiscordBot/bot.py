@@ -124,11 +124,8 @@ class ModBot(discord.Client):
         # Check if the message for this channel matches any of the specific regexes
         for channel, regex in self.regexes.items():
             if channel == f'group-{self.group_num}':
-                print(message.content)
-                print(regex)
                 pattern = re.compile(regex)
                 matched = re.search(pattern, message.content) != None
-                print(matched)
 
                 if matched:
                     await message.delete()
@@ -143,13 +140,11 @@ class ModBot(discord.Client):
         # Open ai evaluation
         isToxic_open_ai, report_open_ai = self.eval_text_open_ai(message)
         if isToxic_open_ai:
-            print('OPEN AI HANDLING')
             await self.handle_mod_channel_message(message, "start", report_open_ai)
 
         # Perspective ai evaluation
         # isToxic_perspective_ai, report_perspective_ai = self.eval_text_perspective_ai(message)
         # if isToxic_perspective_ai:
-        #    print('PERSPECTIVE AI HANDLING')
         #    await self.handle_mod_channel_message(message, "start", report_perspective_ai)
 
     async def handle_mod_channel_message(self, message, keyword="", report=None):
