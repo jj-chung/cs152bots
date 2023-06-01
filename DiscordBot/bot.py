@@ -285,23 +285,23 @@ class ModBot(discord.Client):
 
         # Ask gpt-4 whether a message is toxic and what category a message belongs to (high-level, not limited to hate speech)
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
             {"role": "system", "content": "You are a message moderation system on twitch. Classify each message as toxic (True)" + 
              "or non-toxic (False). If it is toxic, then choose the correct category out of 1. Transphobic Hate Speech" + "\n2. Nudity or Sexual Activity" + 
              "\n3. Harassment" + "\n4. Imminent Danger. Category 1 (Hate Speech) includes deadnaming, use of transphobic slurs, and misgendering."},
             {"role": "user", "content": "user123: I love puppies"},
             {"role": "assistant", "content": "False, None"},
-            {"role": "user", "content": ""},
+            {"role": "user", "content": "Transgender people are disgusting freaks and groomers who aren't real. " + 
+             "They're bad for families and children. " + 
+             "They don't deserve any rights or respect."},
             {"role": "assistant", "content": "True, 1"},
-            {"role": "user", "content": ""},
+            {"role": "user", "content": "Can I get some nude pics? You should come over to my place for a good time"},
             {"role": "assistant", "content": "True, 2"},
-            {"role": "user", "content": ""},
+            {"role": "user", "content": "I know your name and address! Going to reveal it to everyone now."},
             {"role": "assistant", "content": "True, 3"},
-            {"role": "user", "content": ""},
+            {"role": "user", "content": "I'm coming to your house to find you and hurt you."},
             {"role": "assistant", "content": "True, 4"},
-            {"role": "user", "content": ""},
-            {"role": "assistant", "content": "True, 5"},
             {"role": "user", "content": f"{message.author.name}: {message.content}"}
             ]
         )
@@ -324,11 +324,11 @@ class ModBot(discord.Client):
                         "2. The content misgenders someone" + "\n" +
                         "3. The content includes a slur"
                         "4. The content is non-toxic"},
-                {"role": "user", "content": ""},
+                {"role": "user", "content": "Your profile says Elizabeth but I know your real name is Elijah."},
                 {"role": "assistant", "content": "1"},
-                {"role": "user", "content": ""},
+                {"role": "user", "content": "I know what your pronouns are, but I'm just going to call you by he/him."},
                 {"role": "assistant", "content": "2"},
-                {"role": "user", "content": ""},
+                {"role": "user", "content": "Tranny"},
                 {"role": "assistant", "content": "3"},
                 {"role": "user", "content": message.content},
                 ]
