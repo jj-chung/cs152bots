@@ -147,10 +147,10 @@ class ModBot(discord.Client):
             await self.handle_mod_channel_message(message, "start", report_open_ai)
 
         # Perspective ai evaluation
-        isToxic_perspective_ai, report_perspective_ai = self.eval_text_perspective_ai(message)
-        if isToxic_perspective_ai:
-            print('PERSPECTIVE AI HANDLING')
-            await self.handle_mod_channel_message(message, "start", report_perspective_ai)
+        # isToxic_perspective_ai, report_perspective_ai = self.eval_text_perspective_ai(message)
+        # if isToxic_perspective_ai:
+        #    print('PERSPECTIVE AI HANDLING')
+        #    await self.handle_mod_channel_message(message, "start", report_perspective_ai)
 
     async def handle_mod_channel_message(self, message, keyword="", report=None):
         mod_channel = self.mod_channels[1103033282779676743]
