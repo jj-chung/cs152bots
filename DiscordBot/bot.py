@@ -138,14 +138,14 @@ class ModBot(discord.Client):
         # await mod_channel.send(self.code_format(scores))
 
         # Open ai evaluation
-        isToxic_open_ai, report_open_ai = self.eval_text_open_ai(message)
-        if isToxic_open_ai:
-            await self.handle_mod_channel_message(message, "start", report_open_ai)
+        # isToxic_open_ai, report_open_ai = self.eval_text_open_ai(message)
+        # if isToxic_open_ai:
+        #    await self.handle_mod_channel_message(message, "start", report_open_ai)
 
         # Perspective ai evaluation
-        # isToxic_perspective_ai, report_perspective_ai = self.eval_text_perspective_ai(message)
-        # if isToxic_perspective_ai:
-        #    await self.handle_mod_channel_message(message, "start", report_perspective_ai)
+        isToxic_perspective_ai, report_perspective_ai = self.eval_text_perspective_ai(message)
+        if isToxic_perspective_ai:
+            await self.handle_mod_channel_message(message, "start", report_perspective_ai)
 
     async def handle_mod_channel_message(self, message, keyword="", report=None):
         mod_channel = self.mod_channels[1103033282779676743]
@@ -228,6 +228,7 @@ class ModBot(discord.Client):
         maxCategory = max(categoryScores, key=categoryScores.get)
         summaryScore = response_content["attributeScores"][maxCategory]["summaryScore"]["value"]
         is_content_toxic = summaryScore > 0.6
+        print(summaryScore)
 
         if is_content_toxic:
             if maxCategory == "IDENTITY_ATTACK":

@@ -243,7 +243,7 @@ class ModReview:
             self.state = State.REVIEW_COMPLETE
             return ["Report dismissed."]
         
-        if self.state == State.REVIEW_START:
+        if self.state == State.REVIEW_START or message.content == self.START_REVIEW_KEYWORD:
             reply =  "Thank you for starting the reviewing process. \n "
             for key, value in self.report_dict.items():
                 if value is not None:
@@ -258,11 +258,11 @@ class ModReview:
                 userStatsDict = {}
                 with open(self.userStats) as userStats:
                     userStatsDict = json.load(userStats)
-                    userStatsDict[message.author.name] = userStatsDict.get(message.author.name, 0) + 1
+                    userStatsDict[self.report.message.author.name] = userStatsDict.get(self.report.message.author.name, 0) + 1
 
                     # If the user has been a perpetrator more than the allotted number of times,
                     # permanently ban them
-                    if userStatsDict[message.author.name] >= self.threshold:
+                    if userStatsDict[self.report.message.author.name] >= self.threshold:
                         return ["The user has been permanently banned for surpassing the number of allowed violations."]
                     
                 with open(self.userStats, 'w') as userStats:
@@ -300,6 +300,7 @@ class ModReview:
                     # Misgendering, Deadnaming, or slurs
                     if category in ["1", "2", "3"]:
                         # Remove the original message
+                        await self.report.message.delete()
                         await self.report.message.channel.send("This message has been removed for violating Twitch's guidelines.")
 
                         # Check if the user has other violations
